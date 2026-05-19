@@ -10,6 +10,7 @@ func TestStore_BasicOperations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	defer os.Remove(f.Name())
 	defer f.Close()
 
