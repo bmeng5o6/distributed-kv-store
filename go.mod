@@ -1,3 +1,3 @@
-module main.go
+module distributed-kv-store
 
 go 1.26.1
