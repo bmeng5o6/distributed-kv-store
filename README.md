@@ -14,10 +14,10 @@ Added 50 virtual nodes per server, which are duplications of original nodes to s
 I used the FNV hash function for the ring, as it was designed for hashing. 
 
 ## Distributedness
-Added multi-node routing with consistent hashing. Each node now forwards requests to the correct owner (`forward` function in `http.go`) based on the hash ring. Clients can hit any node and still get the correct response. 
+Added multi-node routing with hashing. Each node now forwards requests to the correct owner (`forward` function in `http.go`) based on the hash ring. Clients can query any node and still get the correct response. 
 
 ## Replication
-Added `replicate`, which can write directly to replicas from a leader node, with the `X-Replication: true` header. With this header, this prevents updated handle PUT and DELETE functions to not replicate on replications. 
+Added `replicate`, which can write directly to replicas from a leader node, with the `X-Replication: true` header. With this header, this prevents updated handle PUT and DELETE functions to replicate on replications. 
 Wrote `GetNodes` function to grab multiple nodes (replicas of leader). This is used to check replicas for GET, update replicas for PUT and DELETE.
 Together, these allow replicas to hold values that original servers that fail originally held. This means that if servers fall out, values can still be preserved. 
 NOTE: The `count` argument on the `GetNodes` function increases the number of replicas per node. 
