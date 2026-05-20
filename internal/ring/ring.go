@@ -57,3 +57,34 @@ func (r *Ring) GetNode(key string) (string, error) {
 
 	return r.nodes[r.positions[i]], nil
 }
+
+func (r *Ring) GetNodes(key string, count int) ([]string, error) {
+	if len(r.positions) == 0 {
+		return nil, fmt.Errorf("ring is empty")
+	}
+
+	index := hash(key)
+	i := sort.Search(len(r.positions), func(i int) bool {
+		return r.positions[i] >= index
+	})
+
+	if i == len(r.positions) {
+		i = 0
+	}
+
+	var nodes = []string{}
+	seen := make(map[string]bool)
+
+	for j := 0; j < len(r.positions); j++ {
+		node := r.nodes[r.positions[(j+i)%len(r.positions)]]
+		if !seen[node] {
+			nodes = append(nodes, node)
+			seen[node] = true
+		}
+		if len(nodes) == count {
+			break
+		}
+	}
+
+	return nodes, nil
+}
