@@ -32,6 +32,7 @@ func main() {
 	mux.HandleFunc("GET /keys/{key}", srv.HandleGet)
 	mux.HandleFunc("PUT /keys/{key}", srv.HandlePut)
 	mux.HandleFunc("DELETE /keys/{key}", srv.HandleDelete)
+	mux.HandleFunc("GET /health", srv.HandleHealth)
 
 	log.Printf("listening on: %s", *port)
 	log.Fatal(http.ListenAndServe(":"+*port, mux))

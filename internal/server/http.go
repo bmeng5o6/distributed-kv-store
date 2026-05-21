@@ -13,6 +13,7 @@ import (
 type Server struct {
 	Store  *store.Store
 	Router *Router
+	Gossip *Gossip
 }
 
 func NewServer(store *store.Store, self string, peers []string) *Server {
@@ -22,7 +23,10 @@ func NewServer(store *store.Store, self string, peers []string) *Server {
 		r.AddNode(peer)
 	}
 
-	return &Server{Store: store, Router: &Router{self: self, ring: r}}
+	g := NewGossip(self, peers)
+	g.Start()
+
+	return &Server{Store: store, Router: &Router{self: self, ring: r}, Gossip: g}
 }
 
 func (s *Server) forward(w http.ResponseWriter, r *http.Request, owner string) {
@@ -95,6 +99,11 @@ func (s *Server) HandleGet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if !s.Gossip.IsAlive(node) {
+			log.Printf("node %s known dead, skipping", node)
+			continue
+		}
+
 		resp, err := s.tryForward(r, node)
 		if err != nil {
 			log.Printf("node %s unreachable, trying next", node)
@@ -136,7 +145,19 @@ func (s *Server) HandlePut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if nodes[0] != s.Router.self {
-		s.forward(w, r, nodes[0])
+		if s.Gossip.IsAlive(nodes[0]) {
+			s.forward(w, r, nodes[0])
+			return
+		}
+
+		for _, replica := range nodes[1:] {
+			if s.Gossip.IsAlive(replica) {
+				s.forward(w, r, replica)
+				return
+			}
+		}
+
+		http.Error(w, "all nodes unreachable", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -184,7 +205,19 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if nodes[0] != s.Router.self {
-		s.forward(w, r, nodes[0])
+		if s.Gossip.IsAlive(nodes[0]) {
+			s.forward(w, r, nodes[0])
+			return
+		}
+
+		for _, replica := range nodes[1:] {
+			if s.Gossip.IsAlive(replica) {
+				s.forward(w, r, replica)
+				return
+			}
+		}
+
+		http.Error(w, "all nodes unreachable", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -204,4 +237,8 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
