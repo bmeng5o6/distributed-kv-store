@@ -1,4 +1,9 @@
 # distributed-kv-store
+
+A distributed key-value store built in Go, supporting multi-node routing, replication, and failure detection. Deployed to AWS EC2 via Docker.
+
+---
+
 ## Single Server
 
 Built:
@@ -26,3 +31,23 @@ NOTE: The `count` argument on the `GetNodes` function increases the number of re
 
 ## Failure Detection
 Added `gossip.go` file, which introduces the Gossip struct that provides information on the availability of nodes. It runs a goroutine function in `Start()` that continuously checks on the availability of a node's peers, sending a ping to `/health` on each peer. Each peer responsds with `HandleHealth` if it is alive. If a node is dead, it is skipped during routing without waiting for a connection failure or error. This feature helps improve the efficiency of failure detection. 
+
+## Github Actions
+Experimented with adding tests to every push or pull request to the main branch. Ensures quality of code and basic functionality of distributed store. 
+
+## Docker and AWS
+Containerized the project using Docker with a two-stage build. The first stage compiles the Go binary, the second stage copies just the binary into a minimal Alpine image. `docker-compose` starts all three nodes with a single command, with nodes communicating over Docker's internal network by service name.
+
+Deployed the cluster to AWS EC2. I SSH'd into an Amazon Linux instance, installed Docker, cloned the repo, and ran `docker-compose up`. The cluster is accessible over the instance's public IP. Verified replication by reading the WAL file inside individual containers using `docker exec`.
+
+## Running locally
+```bash
+docker-compose up --build
+```
+
+## Running on AWS
+```bash
+ssh -i kv-store-key.pem ec2-user@YOUR_EC2_IP
+cd distributed-kv-store
+docker-compose up -d
+```
