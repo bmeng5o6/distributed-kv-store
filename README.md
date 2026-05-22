@@ -4,6 +4,20 @@ A distributed key-value store built in Go, supporting multi-node routing, replic
 
 ---
 
+## Why Go?
+
+I chose Go because of its concurrency primitives (`goroutines`, `sync.RWMutex`) and the industry's usage of Go in distributed systems, such as with CockroachDB and etcd. The concurrency model maps naturally to a KV store: `RWMutex` allows multiple concurrent readers while blocking writers, which is the right tradeoff for a read-heavy workload.
+
+## Design Decisions
+
+**Leader-based replication over leaderless**: leaderless replication requires vector clocks or last-write-wins to resolve conflicts when two nodes accept writes simultaneously. Leader-based replication avoids this, since one node is the single source of truth per shard, so there are no conflicts to resolve.
+
+**WAL over a database**: a Write Ahead Log is the mechanism databases use internally for durability. I wanted to build it from scratch to better understand how this works, rather than using a database like Postgres or SQLite. 
+
+**FNV over CRC32**: During testing, CRC32 was causing one node to receive 70% of keys. FNV was designed specifically for hash tables and distributes values more evenly across the key space.
+
+**PUT throughput is intentionally bounded by fsync**: I chose to flush to disk before ACKing the client to maintain consistency in data. However, to improve throughput in production, I would implement group commits which would batch multiple writes into a single sync. 
+
 ## Single Server
 
 Built:
@@ -16,7 +30,6 @@ Built:
 Implemented a consistent hash ring, complete with testing. The ring is comprised of many nodes which own a slice of the key space based on the hashed key's value in comparison to the nodes. 
 This allows multiple nodes (servers) to exist, which can own different keys, depending on the key's value. 
 Added 50 virtual nodes per server, which are duplications of original nodes to spread out distribution of keys on the nodes, so one node won't have too many values, and thus a disproportionate number of queries on a single server. Originally, I'd run into an issue of having too many keys on one node (70%, which I discovered through `ring_test.go`), but adding the virtual nodes allowed the keys to be more evenly spread. 
-I used the FNV hash function for the ring, as it was designed for hashing. 
 
 ## Distributedness
 Added multi-node routing with hashing. Each node now forwards requests to the correct owner (`forward` function in `http.go`) based on the hash ring. Clients can query any node and still get the correct response. 
@@ -51,3 +64,15 @@ ssh -i kv-store-key.pem ec2-user@YOUR_EC2_IP
 cd distributed-kv-store
 docker-compose up -d
 ```
+
+## Benchmarks
+
+Run on Apple M5 (`go test -bench=. -benchmem ./internal/store/...`):
+
+| Operation | Throughput | Latency | Memory |
+|---|---|---|---|
+| PUT (single) | ~250 ops/sec | ~4ms | 53 B/op |
+| GET (single) | ~200M ops/sec | 5ns | 0 B/op |
+| GET (concurrent, 10 goroutines) | ~10M ops/sec | 98ns | 0 B/op |
+
+PUT latency is bounded by `fsync` — each write is flushed to disk before ACKing the client, which is the correct tradeoff for durability over throughput.

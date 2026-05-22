@@ -72,3 +72,69 @@ func TestStore_WALReplay(t *testing.T) {
 		t.Errorf("expected othername=joe after replay, got %s", val)
 	}
 }
+
+func BenchmarkStore_Put(b *testing.B) {
+	f, err := os.CreateTemp("", "wal-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	s, err := NewStore(f.Name())
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.Put("key", "value")
+	}
+}
+
+func BenchmarkStore_Get(b *testing.B) {
+	f, err := os.CreateTemp("", "wal-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	s, err := NewStore(f.Name())
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	s.Put("key", "value")
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.Get("key")
+	}
+}
+
+func BenchmarkStore_ConcurrentGet(b *testing.B) {
+	f, err := os.CreateTemp("", "wal-*.log")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer os.Remove(f.Name())
+	defer f.Close()
+
+	s, err := NewStore(f.Name())
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	s.Put("key", "value")
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			s.Get("key")
+		}
+	})
+}
