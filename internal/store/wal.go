@@ -23,7 +23,7 @@ func NewWAL(path string) (*WAL, error) {
 	return &WAL{file: file}, nil
 }
 
-func (w *WAL) Append(op string, key string, value string) error {
+func (w *WAL) Append(op, key, value string) error {
 	_, err := fmt.Fprintf(w.file, "%s %s %s\n", op, key, value)
 	if err != nil {
 		return err
@@ -45,6 +45,11 @@ func Replay(path string) ([][]string, error) {
 		line := scanner.Text()
 		parts := strings.Split(line, " ")
 		results = append(results, parts)
+	}
+
+	err = scanner.Err()
+	if err != nil {
+		return nil, err
 	}
 
 	return results, nil

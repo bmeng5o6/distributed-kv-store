@@ -7,8 +7,8 @@ import (
 )
 
 type Ring struct {
-	positions []uint32
-	nodes     map[uint32]string
+	positions []uint32          // sorted slice of hashed positions, so ring can be walked in order
+	nodes     map[uint32]string // Maps hashed position to server address that owns position
 }
 
 func NewRing() *Ring {
@@ -46,6 +46,7 @@ func (r *Ring) GetNode(key string) (string, error) {
 		return "", fmt.Errorf("ring is empty")
 	}
 
+	// Hash, then find i that r.positions[i] is the smallest value larger than index
 	index := hash(key)
 	i := sort.Search(len(r.positions), func(i int) bool {
 		return r.positions[i] >= index

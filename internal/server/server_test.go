@@ -36,12 +36,23 @@ func TestHandleGet_LocalRead(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	req, _ := http.NewRequest("PUT", ts.URL+"/key/username", strings.NewReader("brian"))
+	req, _ := http.NewRequest("PUT", ts.URL+"/keys/username", strings.NewReader("brian"))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
+
+	resp, err = http.Get(ts.URL + "/keys/username")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if string(body) != "brian" {
+		t.Errorf("expected brian, got %s", string(body))
+	}
 }
 
 func TestHandleGet_Replication(t *testing.T) {
@@ -50,14 +61,12 @@ func TestHandleGet_Replication(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(f1.Name())
-	defer f1.Close()
 
 	f2, err := os.CreateTemp("", "wal-*.log")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(f2.Name())
-	defer f2.Close()
 
 	st1, err := store.NewStore(f1.Name())
 	if err != nil {

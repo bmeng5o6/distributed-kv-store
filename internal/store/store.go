@@ -71,7 +71,10 @@ func (s *Store) Delete(key string) bool {
 		return false
 	}
 
-	s.wal.Append("DELETE", key, "")
+	err := s.wal.Append("DELETE", key, "")
+	if err != nil {
+		return false
+	}
 	delete(s.db, key)
 	return true
 }

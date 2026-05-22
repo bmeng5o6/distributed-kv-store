@@ -81,7 +81,7 @@ func (s *Server) tryForward(r *http.Request, node string) (*http.Response, error
 
 func (s *Server) HandleGet(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
-	nodes, err := s.Router.ring.GetNodes(key, 2)
+	nodes, err := s.Router.GetNodes(key, 2)
 	if err != nil {
 		http.Error(w, "ring error", http.StatusInternalServerError)
 		return
@@ -138,7 +138,7 @@ func (s *Server) HandlePut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes, err := s.Router.ring.GetNodes(key, 2)
+	nodes, err := s.Router.GetNodes(key, 2)
 	if err != nil {
 		http.Error(w, "ring error", http.StatusInternalServerError)
 		return
@@ -182,8 +182,6 @@ func (s *Server) HandlePut(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Printf("owner: %s, self: %s", nodes[0], s.Router.self)
-
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -198,7 +196,7 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	nodes, err := s.Router.ring.GetNodes(key, 2)
+	nodes, err := s.Router.GetNodes(key, 2)
 	if err != nil {
 		http.Error(w, "ring error", http.StatusInternalServerError)
 		return

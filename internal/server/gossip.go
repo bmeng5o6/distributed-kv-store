@@ -28,16 +28,22 @@ func NewGossip(self string, peers []string) *Gossip {
 }
 
 func (g *Gossip) Start() {
+	failures := map[string]int{}
+
 	go func() {
 		for {
 			for _, peer := range g.peers {
 				resp, err := http.Get("http://" + peer + "/health")
 				if err != nil {
-					g.mu.Lock()
-					g.alive[peer] = false
-					g.mu.Unlock()
+					failures[peer]++
+					if failures[peer] >= 3 {
+						g.mu.Lock()
+						g.alive[peer] = false
+						g.mu.Unlock()
+					}
 				} else {
 					resp.Body.Close()
+					failures[peer] = 0
 					g.mu.Lock()
 					g.alive[peer] = true
 					g.mu.Unlock()

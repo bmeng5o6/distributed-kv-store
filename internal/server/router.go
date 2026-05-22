@@ -7,6 +7,6 @@ type Router struct {
 	ring *ring.Ring
 }
 
-func (r *Router) GetNode(key string) (string, error) {
-	return r.ring.GetNode(key)
+func (r *Router) GetNodes(key string, count int) ([]string, error) {
+	return r.ring.GetNodes(key, count)
 }
