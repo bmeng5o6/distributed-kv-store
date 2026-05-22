@@ -1,3 +1,3 @@
 module distributed-kv-store
 
-go 1.26.1
+go 1.24.1

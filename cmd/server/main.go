@@ -12,6 +12,7 @@ import (
 func main() {
 	port := flag.String("port", "8080", "port to listen on")
 	peers := flag.String("peers", "", "comma separated peer addresses")
+	host := flag.String("host", "localhost", "hostname of this code")
 
 	flag.Parse()
 
@@ -20,7 +21,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	self := "localhost:" + *port
+	self := *host + ":" + *port
 	var peerList []string
 	if *peers != "" {
 		peerList = strings.Split(*peers, ",")
