@@ -6,15 +6,18 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
 func main() {
 	port := flag.String("port", "8080", "port to listen on")
 	peers := flag.String("peers", "", "comma separated peer addresses")
-	host := flag.String("host", "localhost", "hostname of this code")
+	host := flag.String("host", "localhost", "hostname of this node")
 
 	flag.Parse()
+
+	os.Remove("wal.log")
 
 	st, err := store.NewStore("wal.log")
 	if err != nil {

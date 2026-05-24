@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type Server struct {
@@ -15,6 +16,8 @@ type Server struct {
 	Router *Router
 	Gossip *Gossip
 }
+
+var httpClient = &http.Client{Timeout: 500 * time.Millisecond}
 
 func NewServer(store *store.Store, self string, peers []string) *Server {
 	r := ring.NewRing()
@@ -37,7 +40,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, owner string) {
 		return
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		http.Error(w, "forward error", http.StatusBadGateway)
 		return
@@ -62,7 +65,7 @@ func (s *Server) replicate(method, key, value, addr string) error {
 	}
 	req.Header.Set("X-Replication", "true")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -76,7 +79,7 @@ func (s *Server) tryForward(r *http.Request, node string) (*http.Response, error
 	if err != nil {
 		return nil, err
 	}
-	return http.DefaultClient.Do(req)
+	return httpClient.Do(req)
 }
 
 func (s *Server) HandleGet(w http.ResponseWriter, r *http.Request) {
@@ -146,8 +149,15 @@ func (s *Server) HandlePut(w http.ResponseWriter, r *http.Request) {
 
 	if nodes[0] != s.Router.self {
 		if s.Gossip.IsAlive(nodes[0]) {
-			s.forward(w, r, nodes[0])
-			return
+			resp, err := s.tryForward(r, nodes[0])
+			if err == nil {
+				defer resp.Body.Close()
+				body, _ := io.ReadAll(resp.Body)
+				w.WriteHeader(resp.StatusCode)
+				w.Write(body)
+				return
+			}
+			log.Printf("leader %s unreachable, trying replicas immediately", nodes[0])
 		}
 
 		for _, replica := range nodes[1:] {
@@ -204,8 +214,15 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *http.Request) {
 
 	if nodes[0] != s.Router.self {
 		if s.Gossip.IsAlive(nodes[0]) {
-			s.forward(w, r, nodes[0])
-			return
+			resp, err := s.tryForward(r, nodes[0])
+			if err == nil {
+				defer resp.Body.Close()
+				body, _ := io.ReadAll(resp.Body)
+				w.WriteHeader(resp.StatusCode)
+				w.Write(body)
+				return
+			}
+			log.Printf("leader %s unreachable, trying replicas immediately", nodes[0])
 		}
 
 		for _, replica := range nodes[1:] {
