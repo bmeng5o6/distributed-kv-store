@@ -18,6 +18,13 @@ I chose Go because of its concurrency primitives (`goroutines`, `sync.RWMutex`) 
 
 **PUT throughput is intentionally bounded by fsync**: I chose to flush to disk before ACKing the client to maintain consistency in data. However, to improve throughput in production, I would implement group commits which would batch multiple writes into a single sync. 
 
+**Immediate replica fallback over waiting for gossip**: Originally, when a leader node was unreachable, the server returned a 502 and waited for gossip to mark the node dead (up to 3 seconds) before routing to a replica. I changed this so that any forward error immediately falls through to the replica. This reduced failover recovery time from ~3s to ~10ms under continuous load.
+
+**Gossip interval of 500ms with 2-strike rule**: Pinging every 500ms means a dead node is marked dead within ~1 second. Using 3 strikes instead would extend this to 1.5 seconds unnecessarily. The tradeoff is that a faster interval may cause more false positives, in that a slower node may be marked as dead, if not responsive within that time limit. 
+
+**Shared HTTP client with 500ms timeout**: All inter-node requests now use a shared `http.Client` with a 500ms timeout rather than `http.DefaultClient`, which has no timeout. This prevents hung nodes from blocking requests indefinitely. A tighter timeout would detect slow nodes faster but risks false positives in skipping nodes.
+
+
 ## Single Server
 
 Built:
@@ -44,6 +51,18 @@ NOTE: The `count` argument on the `GetNodes` function increases the number of re
 
 ## Failure Detection
 Added `gossip.go` file, which introduces the Gossip struct that provides information on the availability of nodes. It runs a goroutine function in `Start()` that continuously checks on the availability of a node's peers, sending a ping to `/health` on each peer. Each peer responsds with `HandleHealth` if it is alive. If a node is dead, it is skipped during routing without waiting for a connection failure or error. This feature helps improve the efficiency of failure detection. 
+
+## Failover Recovery Optimization
+
+The original implementation returned a 502 when the leader was unreachable, relying on gossip to eventually mark the node dead before rerouting. This created a recovery window of up to 3 seconds.
+
+The fix was that in the case of a forward error to immediately try the replica. Gossip still runs in the background to mark the node dead for future routing decisions, but in-flight requests won't wait for it.
+
+| Version | Recovery Time |
+|---|---|
+| Original (wait for gossip) | ~3s |
+| After immediate fallback | ~55ms at 20 req/sec |
+| After immediate fallback | ~10ms under continuous load |
 
 ## Github Actions
 Experimented with adding tests to every push or pull request to the main branch. Ensures quality of code and basic functionality of distributed store. 
@@ -74,5 +93,7 @@ Run on Apple M5 (`go test -bench=. -benchmem ./internal/store/...`):
 | PUT (single) | ~250 ops/sec | ~4ms | 53 B/op |
 | GET (single) | ~200M ops/sec | 5ns | 0 B/op |
 | GET (concurrent, 10 goroutines) | ~10M ops/sec | 98ns | 0 B/op |
+| Leader failover (continuous load) | — | ~10ms recovery | — |
+| Leader failover (20 req/sec) | — | ~55ms recovery | — |
 
 PUT latency is bounded by `fsync` — each write is flushed to disk before ACKing the client, which is the correct tradeoff for durability over throughput.

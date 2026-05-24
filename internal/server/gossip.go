@@ -36,7 +36,7 @@ func (g *Gossip) Start() {
 				resp, err := http.Get("http://" + peer + "/health")
 				if err != nil {
 					failures[peer]++
-					if failures[peer] >= 3 {
+					if failures[peer] >= 2 {
 						g.mu.Lock()
 						g.alive[peer] = false
 						g.mu.Unlock()
@@ -49,7 +49,7 @@ func (g *Gossip) Start() {
 					g.mu.Unlock()
 				}
 			}
-			time.Sleep(time.Second)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}()
 }
